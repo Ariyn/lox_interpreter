@@ -10,48 +10,71 @@ var _ ExprVisitor = (*AstPrinter)(nil)
 type AstPrinter struct{}
 
 func (ap *AstPrinter) VisitListExpr(expr *ListExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return ap.parenthesize("list", expr.values...)
 }
 
 func (ap *AstPrinter) VisitDictionaryExpr(expr *DictionaryExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	builder := "(dict"
+	for k, v := range expr.mapExpr {
+		p, err := ap.parenthesize(k.Lexeme, v)
+		if err != nil {
+			return "", err
+		}
+		builder += " " + p
+	}
+	builder += ")"
+	return builder, nil
 }
 
 func (ap *AstPrinter) VisitSelectExpr(expr *SelectExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return ap.parenthesize("select", expr.object, expr.name)
 }
 
 func (ap *AstPrinter) VisitSuperExpr(expr *SuperExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return fmt.Sprintf("(%s %s)", expr.keyword.Lexeme, expr.method.Lexeme), nil
 }
 
 func (ap *AstPrinter) VisitThisExpr(expr *ThisExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return expr.keyword.Lexeme, nil
 }
 
 func (ap *AstPrinter) VisitSetExpr(expr *SetExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return ap.parenthesize("set "+expr.name.Lexeme, expr.object, expr.value)
 }
 
 func (ap *AstPrinter) VisitGetExpr(expr *GetExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return ap.parenthesize("get "+expr.name.Lexeme, expr.object)
 }
 
 func (ap *AstPrinter) VisitClassStmt(expr *ClassStmt) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	builder := "(class " + expr.name.Lexeme
+	if expr.superClass != nil {
+		sc, err := ap.parenthesize("super", expr.superClass)
+		if err != nil {
+			return "", err
+		}
+		builder += " " + sc
+	}
+	for _, method := range expr.methods {
+		m, err := method.Accept(ap)
+		if err != nil {
+			return "", err
+		}
+		builder += " " + toString(m)
+	}
+	builder += ")"
+	return builder, nil
 }
 
 func (ap *AstPrinter) VisitReturnStmt(expr *ReturnStmt) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	if expr.value != nil {
+		v, err := expr.value.Accept(ap)
+		if err != nil {
+			return "", err
+		}
+		return "(return " + toString(v) + ")", nil
+	}
+	return "(return)", nil
 }
 
 func (ap *AstPrinter) Print(stmts []Stmt) (string, error) {
@@ -95,13 +118,19 @@ func (ap *AstPrinter) VisitPrintStmt(expr *PrintStmt) (interface{}, error) {
 }
 
 func (ap *AstPrinter) VisitWhileStmt(expr *WhileStmt) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	cond, err := expr.condition.Accept(ap)
+	if err != nil {
+		return "", err
+	}
+	body, err := expr.body.Accept(ap)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("(while %s %s)", toString(cond), toString(body)), nil
 }
 
 func (ap *AstPrinter) VisitBreakStmt(expr *BreakStmt) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return "(" + expr.keyword.Lexeme + ")", nil
 }
 
 func (ap *AstPrinter) VisitBlockStmt(expr *BlockStmt) (interface{}, error) {
@@ -120,13 +149,42 @@ func (ap *AstPrinter) VisitBlockStmt(expr *BlockStmt) (interface{}, error) {
 }
 
 func (ap *AstPrinter) VisitIfStmt(expr *IfStmt) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	cond, err := expr.condition.Accept(ap)
+	if err != nil {
+		return "", err
+	}
+	thenStr, err := expr.thenBranch.Accept(ap)
+	if err != nil {
+		return "", err
+	}
+	if expr.elseBranch != nil {
+		elseStr, err := expr.elseBranch.Accept(ap)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("(if %s %s %s)", toString(cond), toString(thenStr), toString(elseStr)), nil
+	}
+	return fmt.Sprintf("(if %s %s)", toString(cond), toString(thenStr)), nil
 }
 
 func (ap *AstPrinter) VisitFunStmt(expr *FunStmt) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	builder := "(fun " + expr.name.Lexeme + " ("
+	for i, p := range expr.params {
+		if i > 0 {
+			builder += " "
+		}
+		builder += p.Lexeme
+	}
+	builder += ")"
+	for _, stmt := range expr.body {
+		s, err := stmt.Accept(ap)
+		if err != nil {
+			return "", err
+		}
+		builder += " " + toString(s)
+	}
+	builder += ")"
+	return builder, nil
 }
 
 func (ap *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
@@ -134,8 +192,7 @@ func (ap *AstPrinter) VisitAssignExpr(expr *AssignExpr) (interface{}, error) {
 }
 
 func (ap *AstPrinter) VisitLogicalExpr(expr *LogicalExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	return ap.parenthesize(expr.operator.Lexeme, expr.left, expr.right)
 }
 
 func (ap *AstPrinter) VisitTernaryExpr(expr *TernaryExpr) (interface{}, error) {
@@ -208,8 +265,8 @@ func (ap *RPNAstPrinter) VisitGroupingExpr(expr *GroupingExpr) (interface{}, err
 }
 
 func (ap *AstPrinter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
-	//TODO implement me
-	panic("implement me")
+	exprs := append([]Expr{expr.callee}, expr.arguments...)
+	return ap.parenthesize("call", exprs...)
 }
 
 func (ap *AstPrinter) VisitVariableExpr(expr *VariableExpr) (interface{}, error) {
