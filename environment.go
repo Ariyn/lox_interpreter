@@ -27,10 +27,14 @@ func NewEnvironment(enclosing *Environment) *Environment {
 	}
 }
 
-// FIXME: if distance is greater than the number of enclosing environments, this will return wrong one.
+// ancestor returns the environment `distance` steps above the current one.
+// If the requested depth is out of range, it returns nil.
 func (e *Environment) ancestor(distance int) *Environment {
 	env := e
 	for i := 0; i < distance; i++ {
+		if env == nil {
+			return nil
+		}
 		env = env.Enclosing
 	}
 
@@ -64,16 +68,30 @@ func (e *Environment) Assign(name Token, value interface{}) error {
 }
 
 func (e *Environment) AssignAt(distance int, name Token, value interface{}) error {
-	if e.ancestor(distance) == nil {
+	if distance >= e.depth() {
 		return NewEnvironmentError(name, fmt.Sprintf("Invalid ancestor. current : %d, distance: %d", e.depth(), distance))
 	}
 
-	e.ancestor(distance).Values[name.Lexeme] = value
+	ancestor := e.ancestor(distance)
+	if ancestor == nil {
+		return NewEnvironmentError(name, fmt.Sprintf("Invalid ancestor. current : %d, distance: %d", e.depth(), distance))
+	}
+
+	ancestor.Values[name.Lexeme] = value
 	return nil
 }
 
 func (e *Environment) GetAt(distance int, name Token) (v interface{}, err error) {
-	v, ok := e.ancestor(distance).Values[name.Lexeme]
+	if distance >= e.depth() {
+		return nil, NewEnvironmentError(name, fmt.Sprintf("Invalid ancestor. current : %d, distance: %d", e.depth(), distance))
+	}
+
+	ancestor := e.ancestor(distance)
+	if ancestor == nil {
+		return nil, NewEnvironmentError(name, fmt.Sprintf("Invalid ancestor. current : %d, distance: %d", e.depth(), distance))
+	}
+
+	v, ok := ancestor.Values[name.Lexeme]
 	if !ok {
 		return nil, NewEnvironmentError(name, fmt.Sprintf("Undefined variable '%s'", name.Lexeme))
 	}
@@ -82,7 +100,16 @@ func (e *Environment) GetAt(distance int, name Token) (v interface{}, err error)
 }
 
 func (e *Environment) GetAtWithString(distance int, name string) (v interface{}, err error) {
-	v, ok := e.ancestor(distance).Values[name]
+	if distance >= e.depth() {
+		return nil, fmt.Errorf("Invalid ancestor. current : %d, distance: %d", e.depth(), distance)
+	}
+
+	ancestor := e.ancestor(distance)
+	if ancestor == nil {
+		return nil, fmt.Errorf("Invalid ancestor. current : %d, distance: %d", e.depth(), distance)
+	}
+
+	v, ok := ancestor.Values[name]
 	if !ok {
 		return nil, fmt.Errorf("Undefined variable '%s'", name)
 	}
