@@ -436,9 +436,9 @@ func (i *Interpreter) VisitUnaryExpr(expr *UnaryExpr) (interface{}, error) {
 		return -right.(float64), nil
 	case BANG:
 		return !i.isTruthy(right), nil
+	default:
+		return nil, NewRuntimeError(expr.operator, fmt.Sprintf("Unknown unary operator %s", expr.operator.Lexeme), i.callStack)
 	}
-
-	return nil, nil // TODO: return error
 }
 
 func (i *Interpreter) VisitCallExpr(expr *CallExpr) (interface{}, error) {
@@ -602,9 +602,9 @@ func (i *Interpreter) VisitBinaryExpr(expr *BinaryExpr) (interface{}, error) {
 		return left == right, nil
 	case BANG_EQUAL:
 		return left != right, nil
+	default:
+		return nil, NewRuntimeError(expr.operator, fmt.Sprintf("Unknown binary operator %s", expr.operator.Lexeme), i.callStack)
 	}
-
-	return nil, nil // TODO: return error
 }
 
 func (i *Interpreter) VisitLiteralExpr(expr *LiteralExpr) (interface{}, error) {
